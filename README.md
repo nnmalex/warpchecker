@@ -59,6 +59,27 @@ After editing `content.js`, also reload any tab you are testing on.
 
 To regenerate the icons: `python3 tools/make_icons.py` (writes into `icons/`).
 
+## Tests
+
+```sh
+./tools/test.sh
+```
+
+Starts a throwaway headless Chrome, loads the extension over the DevTools
+Protocol, and exercises it end to end — banner injection, live status
+transitions, the dismiss button, badge state, the popup, and a Trusted-Types
+site. Your own Chrome profile is never touched. Requires Chrome 137+ and
+`deno`; screenshots land in `dist/screenshots/`.
+
+The extension is loaded over CDP rather than with `--load-extension` because
+Chrome ignores that flag as of version 137. It stays loaded only while the
+connection that loaded it is open, so the suite loads and tests in one session.
+
+Status transitions are driven by writing to `chrome.storage.session` directly,
+which covers every state regardless of whether WARP is installed on the
+machine running the tests. The live detection path is still exercised once,
+against the real endpoint.
+
 ## Packaging for the Chrome Web Store
 
 ```sh

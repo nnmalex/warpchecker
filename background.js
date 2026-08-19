@@ -52,13 +52,22 @@ async function checkWarp() {
 
   state.lastChecked = Date.now();
   await chrome.storage.session.set({ warpState: state });
-
-  const badge = BADGE[state.status];
-  await chrome.action.setBadgeText({ text: badge.text });
-  await chrome.action.setBadgeBackgroundColor({ color: badge.color });
-
   return state;
 }
+
+// The badge is derived from stored state rather than set alongside it, so the
+// toolbar and the page banner always read from the same source of truth.
+async function applyBadge(state) {
+  const badge = BADGE[state?.status] ?? { text: "", color: "#8a8a8a" };
+  await chrome.action.setBadgeText({ text: badge.text });
+  await chrome.action.setBadgeBackgroundColor({ color: badge.color });
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "session" && changes.warpState) {
+    applyBadge(changes.warpState.newValue);
+  }
+});
 
 // Content scripts are untrusted contexts and cannot read session storage
 // unless the access level is widened.
@@ -117,5 +126,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 allowContentScriptReads();
 ensureAlarm();
 chrome.storage.session.get("warpState").then(({ warpState }) => {
-  if (!warpState) checkWarp();
+  // A restarted worker inherits the stored state but not the badge, so repaint
+  // it from what is already known rather than waiting on the next check.
+  if (warpState) applyBadge(warpState);
+  else checkWarp();
 });
