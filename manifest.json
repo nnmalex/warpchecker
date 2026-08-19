@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "WARP Checker",
+  "version": "1.0.0",
+  "description": "Warns you with a banner on every page when your traffic is not going through Cloudflare WARP.",
+  "minimum_chrome_version": "103",
+  "permissions": ["alarms", "storage"],
+  "host_permissions": ["https://www.cloudflare.com/cdn-cgi/trace"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WARP Checker",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

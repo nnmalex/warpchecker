@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WARP Checker</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #1f1f1f;
+        --muted: #5f6368;
+        --line: #e0e0e0;
+        --btn: #f1f3f4;
+        --btn-hover: #e4e6e8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1f1f1f;
+          --fg: #e8eaed;
+          --muted: #9aa0a6;
+          --line: #3c4043;
+          --btn: #303134;
+          --btn-hover: #3c4043;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        width: 300px;
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+      }
+      .status { display: flex; align-items: center; gap: 10px; }
+      .dot {
+        width: 10px;
+        height: 10px;
+        flex: none;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+      .dot.connected { background: #1e8e3e; }
+      .dot.disconnected { background: #d93025; }
+      .dot.unknown { background: #f9ab00; }
+      h1 { margin: 0; font-size: 15px; font-weight: 600; }
+      p { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+      footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+      .checked { color: var(--muted); font-size: 12px; }
+      button {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--btn);
+        color: var(--fg);
+        font: inherit;
+        font-size: 13px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) { background: var(--btn-hover); }
+      button:disabled { opacity: 0.6; cursor: default; }
+    </style>
+  </head>
+  <body>
+    <div class="status">
+      <span class="dot" id="dot"></span>
+      <h1 id="headline">Checking&hellip;</h1>
+    </div>
+    <p id="detail">Contacting Cloudflare to read your connection status.</p>
+    <footer>
+      <span class="checked" id="checked"></span>
+      <button id="recheck" type="button">Re-check now</button>
+    </footer>
+    <script src="popup.js"></script>
+  </body>
+</html>
