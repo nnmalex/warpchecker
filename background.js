@@ -1,7 +1,25 @@
 const TRACE_URL = "https://www.cloudflare.com/cdn-cgi/trace";
 const ALARM_NAME = "warp-check";
 const CHECK_PERIOD_MINUTES = 1;
-const FETCH_TIMEOUT_MS = 8000;
+const FETCH_TIMEOUT_MS = 6000;
+
+// A dropping tunnel takes the network down with it for a few seconds, so the
+// first request after a disconnect fails and would read as "unknown" — leaving
+// the user unwarned at the one moment they most need it. Measured on macOS,
+// the endpoint becomes reachable again about 7s after the tunnel goes down, so
+// keep retrying past that. The window is bounded by elapsed time rather than a
+// number of attempts because a torn-down network rejects connections instantly,
+// which would otherwise burn every attempt in a second or two.
+// A genuinely offline machine fails the whole window and still lands on
+// "unknown", which is the behaviour that keeps it from crying wolf.
+const RETRY_WINDOW_MS = 20000;
+const RETRY_GAP_MS = 2500;
+
+// Polling alone means up to a full period of silence after a drop. Loading a
+// page is the moment the warning actually matters, so a content script asking
+// for state with a reading older than this triggers a refresh behind the
+// answer it gets back.
+const STALE_MS = 30000;
 
 const STATUS = {
   CONNECTED: "connected",
@@ -24,31 +42,48 @@ function parseTrace(body) {
   return values;
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchTrace() {
+  const response = await fetch(TRACE_URL, {
+    cache: "no-store",
+    credentials: "omit",
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return parseTrace(await response.text());
+}
+
+function classify(trace) {
+  const warp = trace.warp;
+  if (warp === "on" || warp === "plus") {
+    return { status: STATUS.CONNECTED, detail: warp };
+  }
+  if (warp === "off") {
+    return { status: STATUS.DISCONNECTED, detail: warp };
+  }
+  // Reachable but no recognisable warp field: don't accuse.
+  return { status: STATUS.UNKNOWN, detail: "unrecognised response" };
+}
+
 async function checkWarp() {
   let state;
-  try {
-    const response = await fetch(TRACE_URL, {
-      cache: "no-store",
-      credentials: "omit",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  let lastError;
+  const deadline = Date.now() + RETRY_WINDOW_MS;
 
-    const trace = parseTrace(await response.text());
-    const warp = trace.warp;
-
-    if (warp === "on" || warp === "plus") {
-      state = { status: STATUS.CONNECTED, detail: warp };
-    } else if (warp === "off") {
-      state = { status: STATUS.DISCONNECTED, detail: warp };
-    } else {
-      // Endpoint reachable but no recognisable warp field: don't accuse.
-      state = { status: STATUS.UNKNOWN, detail: "unrecognised response" };
+  do {
+    try {
+      state = classify(await fetchTrace());
+      break;
+    } catch (error) {
+      lastError = error;
+      await sleep(RETRY_GAP_MS);
     }
-  } catch (error) {
-    // Offline, captive portal, DNS failure: unknown, never "disconnected".
-    state = { status: STATUS.UNKNOWN, detail: String(error.message || error) };
-  }
+  } while (Date.now() < deadline);
+
+  // Every attempt failed: offline, captive portal, DNS still down. Unknown,
+  // never "disconnected".
+  state ??= { status: STATUS.UNKNOWN, detail: String(lastError?.message || lastError) };
 
   state.lastChecked = Date.now();
   await chrome.storage.session.set({ warpState: state });
@@ -115,7 +150,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // setAccessLevel call above. Messaging also wakes the worker if it is idle.
     chrome.storage.session
       .get("warpState")
-      .then(({ warpState }) => warpState || checkWarp())
+      .then(({ warpState }) => {
+        if (!warpState) return checkWarp();
+        // Answer from what is known so the banner appears without waiting on
+        // the network; a stale reading is refreshed in the background and
+        // reaches the page through the storage listener.
+        if (Date.now() - warpState.lastChecked > STALE_MS) checkWarp();
+        return warpState;
+      })
       .then(sendResponse);
     return true;
   }

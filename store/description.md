@@ -47,6 +47,7 @@ FEATURES
 
 • Persistent banner on every page while WARP is disconnected
 • Red badge on the toolbar icon, visible even on pages the banner cannot reach
+• Checks again whenever you load a page, so a drop surfaces while you browse
 • Popup showing current status, last check time, and a "Re-check now" button
 • Recognises both WARP and WARP+
 • Stays quiet when you are simply offline — no false alarms when there is no
