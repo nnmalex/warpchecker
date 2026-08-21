@@ -12,16 +12,16 @@ const STYLES = `
     z-index: 2147483647;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     box-sizing: border-box;
-    padding: 10px 16px;
+    padding: 12px 19px;
     background: #b3261e;
     color: #ffffff;
-    font: 500 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    font: 500 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
       Helvetica, Arial, sans-serif;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   }
-  .icon { flex: none; font-size: 16px; }
+  .icon { flex: none; font-size: 19px; }
   .text { flex: 1 1 auto; }
   .close {
     flex: none;
@@ -29,9 +29,9 @@ const STYLES = `
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: 18px;
+    font-size: 22px;
     line-height: 1;
-    padding: 2px 6px;
+    padding: 2px 7px;
     border-radius: 4px;
     cursor: pointer;
     opacity: 0.85;
