@@ -53,15 +53,94 @@ it, and it overlays rather than reflows the page. It is built with DOM APIs
 rather than `innerHTML` so that sites enforcing Trusted Types cannot block it.
 Dismissing it hides it for that tab until the page reloads or WARP drops again.
 
+## Administrator settings
+
+The extension can be force-installed from the Google Admin console with
+settings attached. Chrome delivers them through managed storage, shaped by
+[`managed-schema.json`](managed-schema.json).
+
+| Setting            | Type             | Effect                                       |
+| ------------------ | ---------------- | -------------------------------------------- |
+| `enabledPlatforms` | array of strings | Run only on these operating systems          |
+| `bannerMessage`    | string           | Replace the wording shown in the banner      |
+
+Accepted platform names are `Windows`, `macOS`, `ChromeOS`, `Linux` and
+`Android`. Matching ignores case and separators, so `chrome_os` and `ChromeOS`
+are the same thing.
+
+Neither setting is required. With no policy at all — the ordinary Web Store
+install — the extension runs everywhere with its default wording.
+
+### Setting them in the Admin console
+
+**Admin console → Devices → Chrome → Apps & extensions → Users & browsers**,
+select WARP Checker, set **Installation policy** to *Force install*, and paste
+into **Policy for extensions**:
+
+```json
+{
+  "enabledPlatforms": { "Value": ["Windows", "ChromeOS"] },
+  "bannerMessage": {
+    "Value": "WARP is off — reconnect, or call the IT help desk on 1234."
+  }
+}
+```
+
+Each setting is wrapped in `{"Value": …}`; that is the Admin console's own
+format, not something this extension asks for. Either key can be left out.
+Policy applies at the organisational unit the setting is made on, so a
+platform-specific OU can be given its own list.
+
+To confirm what actually arrived on a device, open `chrome://policy` there and
+press **Reload policies**; the extension's settings appear under its ID, with
+an error against anything Chrome rejected.
+
+### `enabledPlatforms` silences the extension, not just the banner
+
+On an operating system left off the list, WARP Checker does nothing at all: no
+connection checks, no network requests, no toolbar badge, no banner. The popup
+is the only part that still speaks, and only to say **"Not enabled on your
+OS"** — so a user who wonders why their colleague has a banner and they do not
+gets an answer instead of a silent, apparently broken extension.
+
+Adding a platform to the list later starts it checking again without a browser
+restart, and removing one stops it just as promptly.
+
+### An unreadable list means "no restriction"
+
+`enabledPlatforms` is ignored — and the extension runs everywhere — when it is
+empty, is not a list, or names **any** operating system that is not one of the
+accepted values. One mistyped entry therefore drops the whole restriction
+rather than applying the rest of it.
+
+This is deliberate, and it is the trade worth understanding: `["Windows",
+"Widnows"]` leaves macOS users with a banner they were not meant to see, where
+the alternative would leave Windows users silently unprotected. A half-filled
+or mistyped policy form is a far likelier explanation than a deliberate request
+for silence, and an admin who wants the extension off everywhere can simply not
+install it. Chrome validates against the schema before the extension sees
+anything, so a rejected value usually shows up in `chrome://policy` first.
+
+### `bannerMessage`
+
+Inserted as plain text, never as markup, and truncated at 300 characters — the
+banner is a fixed strip across the top of every page, and a longer message
+would swallow the page rather than warn about it. Leading, trailing and
+repeated whitespace is collapsed; a blank string falls back to the default.
+
+It also replaces the explanatory line in the popup, so the admin's wording is
+what the user reads in both places.
+
 ## Layout
 
 ```
-manifest.json     Manifest V3 definition
-background.js     Service worker: polling, parsing, state, badge
-content.js        Banner injection (all pages, top frame only)
-popup.html/.js    Status card with a "Re-check now" button
-icons/            16/32/48/128 px PNGs
-store/            Chrome Web Store listing copy (not shipped)
+manifest.json       Manifest V3 definition
+managed-schema.json Settings an administrator can push from Google Admin
+background.js       Service worker: polling, parsing, state, policy, badge
+content.js          Banner injection (all pages, top frame only)
+popup.html/.js      Status card with a "Re-check now" button
+icons/              16/32/48/128 px PNGs
+store/              Chrome Web Store listing copy (not shipped)
 ```
 
 There is no build step. The repository root is the extension.
@@ -99,6 +178,37 @@ Status transitions are driven by writing to `chrome.storage.session` directly,
 which covers every state regardless of whether WARP is installed on the
 machine running the tests. The live detection path is still exercised once,
 against the real endpoint.
+
+Administrator settings are covered the same way. Chrome fills `storage.managed`
+from the platform's own policy store — the Windows registry, a macOS
+configuration profile — which a throwaway profile cannot populate, so the suite
+asserts on the rules themselves (`enabledOn`, `sanitiseMessage`) in the worker
+directly, and drives the rest from a resolved policy: that an excluded platform
+loses its banner, its badge, its stored reading and its periodic check, that
+including it again restarts the check, that a reworded policy reaches a banner
+already on screen, and that the popup says "Not enabled on your OS" and hides
+its button.
+
+What is not machine-checked is Chrome's own delivery of the values. That is
+worth one manual pass before shipping a change to `managed-schema.json`: load
+the extension unpacked, apply a policy for its ID by hand, and confirm at
+`chrome://policy` that the values arrive unrejected. On Linux that is a file in
+`/etc/opt/chrome/policies/managed/`:
+
+```json
+{
+  "3rdparty": {
+    "extensions": {
+      "<extension-id>": { "enabledPlatforms": ["Windows"] }
+    }
+  }
+}
+```
+
+On Windows the equivalent lives under
+`HKLM\Software\Policies\Google\Chrome\3rdparty\extensions\<extension-id>`,
+and on macOS it takes a configuration profile — note that the `{"Value": …}`
+wrapper is an Admin console convention and does **not** appear in any of these.
 
 For the real thing:
 

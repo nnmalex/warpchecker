@@ -54,6 +54,9 @@ FEATURES
   network to check against
 • Dismiss the banner for a tab when you need an unobstructed view; it returns
   on reload or the next time WARP drops
+• For managed deployments: administrators can limit it to chosen operating
+  systems — where it is excluded it goes completely silent, making no checks
+  at all — and can replace the banner wording with their own
 
 PRIVACY
 
@@ -102,7 +105,11 @@ background service worker.
 ```
 Used to share the current WARP status between the background worker, the
 banner shown on pages, and the popup. Only the status string and a timestamp
-are stored, in session storage on the user's device.
+are stored, in session storage on the user's device. It also reads the
+managed-storage settings an administrator may attach to a force-installed
+copy (which operating systems the extension runs on, and the banner wording);
+these are provided by Chrome from the device's policy store and are never
+transmitted.
 ```
 
 - Host permissions / access to all sites (content script on `<all_urls>`)

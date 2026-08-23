@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-03/schema#",
+  "title": "WARP Checker policies",
+  "description": "Settings an administrator can push to WARP Checker when force-installing it from the Google Admin console.",
+  "type": "object",
+  "properties": {
+    "enabledPlatforms": {
+      "title": "Run only on these operating systems",
+      "description": "Operating systems on which WARP Checker is active. On any other operating system it stays completely silent: it does not check the connection, badge the toolbar or show a banner, and the popup says it is not enabled there. Leave this unset to run everywhere. A list that is empty, or that names an operating system not in the list of accepted values, is ignored and the extension runs everywhere.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["Windows", "macOS", "ChromeOS", "Linux", "Android"]
+      }
+    },
+    "bannerMessage": {
+      "title": "Banner message",
+      "description": "Replaces the wording shown in the banner, for example to name an internal help desk. Plain text only; leave unset for the default message. Long messages are truncated to 300 characters.",
+      "type": "string"
+    }
+  }
+}
