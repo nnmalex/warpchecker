@@ -1,6 +1,12 @@
 const HOST_ID = "warp-checker-banner-host";
-const MESSAGE =
-  "Cloudflare WARP is not connected — please connect before continuing.";
+
+// The banner's wording, and whether this platform gets one at all, are both
+// decided by the service worker — the only context that can read managed
+// policy and the platform. Until it answers, assume the unmanaged defaults.
+const DEFAULT_POLICY = {
+  enabled: true,
+  message: "Cloudflare WARP is not connected — please connect before continuing.",
+};
 
 const STYLES = `
   :host { all: initial; }
@@ -41,10 +47,16 @@ const STYLES = `
 
 let host = null;
 let dismissed = false;
+let policy = DEFAULT_POLICY;
+let state = null;
+// What the visible banner actually says, so a policy change that rewords it is
+// noticed even though the rest of the banner is unchanged.
+let rendered = null;
 
 function removeBanner() {
   host?.remove();
   host = null;
+  rendered = null;
 }
 
 function el(tag, className, text) {
@@ -55,7 +67,11 @@ function el(tag, className, text) {
 }
 
 function showBanner() {
-  if (host || !document.documentElement) return;
+  if (!document.documentElement) return;
+  if (host && rendered === policy.message) return;
+  // Rewording is rare enough that rebuilding beats keeping a handle on the
+  // text node alive across renders.
+  removeBanner();
 
   host = document.createElement("div");
   host.id = HOST_ID;
@@ -80,32 +96,41 @@ function showBanner() {
     removeBanner();
   });
 
-  bar.append(icon, el("span", "text", MESSAGE), close);
+  bar.append(icon, el("span", "text", policy.message), close);
   root.appendChild(bar);
   document.documentElement.appendChild(host);
+  rendered = policy.message;
 }
 
-function render(state) {
+function render() {
   const disconnected = state?.status === "disconnected";
 
   // Leaving the disconnected state clears a dismissal, so the banner comes
   // back if WARP drops again without a page reload.
   if (!disconnected) dismissed = false;
 
-  if (disconnected && !dismissed) showBanner();
+  // An administrator can limit the extension to certain operating systems; on
+  // the others it is silent, and no state ever arrives to draw from anyway.
+  if (disconnected && !dismissed && policy.enabled) showBanner();
   else removeBanner();
 }
 
 chrome.runtime
   .sendMessage({ type: "getState" })
-  .then(render)
+  .then((response) => {
+    state = response?.state ?? null;
+    policy = response?.policy ?? policy;
+    render();
+  })
   .catch(() => {
     // Worker not reachable yet (e.g. during an extension reload); the storage
     // listener below will deliver the state as soon as the next check lands.
   });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "session" && changes.warpState) {
-    render(changes.warpState.newValue);
-  }
+  if (areaName !== "session") return;
+
+  if (changes.warpState) state = changes.warpState.newValue;
+  if (changes.warpPolicy) policy = changes.warpPolicy.newValue ?? DEFAULT_POLICY;
+  if (changes.warpState || changes.warpPolicy) render();
 });

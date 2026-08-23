@@ -15,6 +15,7 @@ zip -q -r "$out" \
   manifest.json \
   background.js \
   content.js \
+  managed-schema.json \
   popup.html \
   popup.js \
   icons \

@@ -17,7 +17,9 @@ https://www.cloudflare.com/cdn-cgi/trace
 
 This request is made roughly once a minute while your browser is running, and
 when you press "Re-check now" in the extension popup. It is sent with browser
-credentials omitted, so no cookies or authentication data are attached.
+credentials omitted, so no cookies or authentication data are attached. It is
+not made at all if an administrator has limited the extension to other
+operating systems (see below).
 
 The response is a short plain-text summary of how Cloudflare sees the
 connection. The extension reads a single field from it — `warp` — and discards
@@ -29,6 +31,17 @@ the rest. Cloudflare's handling of that request is governed by
 The current status (`connected`, `disconnected`, or `unknown`) and the time of
 the last check are held in Chrome's session storage on your own device. This is
 cleared when you close the browser. Nothing is written to a remote server.
+
+If your organisation installed the extension for you, your administrator can
+attach settings to it — which operating systems it runs on, and the wording of
+the banner. Chrome delivers these to the extension from your device's own
+policy store. They are read on your device and never sent anywhere, and the
+extension reports nothing back to your administrator.
+
+If your administrator has limited the extension to other operating systems, it
+does nothing on your device: it makes **no** network requests, shows no banner
+and no badge, and the popup simply says it is not enabled on your operating
+system.
 
 ## What is not done
 
@@ -49,7 +62,8 @@ cleared when you close the browser. Nothing is written to a remote server.
   described above.
 - **`alarms`** — to schedule the periodic check.
 - **`storage`** — to share the current status between the background worker,
-  the banner, and the popup on your device.
+  the banner, and the popup on your device, and to read any settings your
+  administrator attached to a managed installation.
 
 ## Contact
 
