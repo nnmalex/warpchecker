@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WARP Checker",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Warns you with a banner on every page when your traffic is not going through Cloudflare WARP.",
   "minimum_chrome_version": "103",
   "permissions": ["alarms", "storage"],

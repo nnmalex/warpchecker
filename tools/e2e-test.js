@@ -377,6 +377,63 @@ check("popup repeats the administrator's wording",
 
 await setPolicy(defaults);
 
+// ── Explaining an unknown status ────────────────────────────────────────────
+// Real network failures cannot be staged in a throwaway browser, so the
+// classification is asserted in the worker and the popup is driven from the
+// state it would produce.
+const FAILURES = [
+  [`describeFailure(new DOMException("t", "TimeoutError")).reason`, "timeout"],
+  [`describeFailure(new HttpError(403)).reason`, "http"],
+  [`describeFailure(new HttpError(403)).httpStatus`, 403],
+  [`describeFailure(new TypeError("Failed to fetch")).reason`, "unreachable"],
+  [`classify({ trace: {}, intercepted: true }).reason`, "intercepted"],
+  [`classify({ trace: {}, intercepted: false }).reason`, "unrecognised"],
+  [`classify({ trace: { warp: "off" }, intercepted: false }).status`, "disconnected"],
+];
+for (const [expression, expected] of FAILURES) {
+  check(`failure rule: ${expression}`, (await c.eval(sw, expression)) === expected);
+}
+
+async function setUnknown(reason, detail) {
+  const state = JSON.stringify({
+    status: "unknown", reason, detail, attempts: 8, lastChecked: Date.now(),
+  });
+  await c.eval(sw, `chrome.storage.session.set({warpState:${state}})`);
+  await sleep(700);
+}
+
+const REASON_COPY = [
+  ["offline", "no network connection", /You're offline/],
+  ["timeout", "no response within 6s", /didn't answer in time/],
+  ["http", "HTTP 403", /refused[\s\S]*HTTP 403/],
+  ["unreachable", "Failed to fetch", /could not be reached[\s\S]*sign in/],
+  ["intercepted", "received a web page", /network answered instead/],
+  ["unrecognised", "unrecognised response", /Unexpected answer/],
+];
+for (const [reason, detail, pattern] of REASON_COPY) {
+  await setUnknown(reason, detail);
+  check(`popup explains an unknown status caused by ${reason}`,
+    pattern.test(await popupText()), await popupText());
+}
+
+const diag = () => c.eval(popup, `document.getElementById("diag-text").textContent`);
+check("popup offers troubleshooting details",
+  (await c.eval(popup, `document.getElementById("diagnostics").hidden`)) === false);
+check("troubleshooting details name the reason and attempts",
+  /Reason: unrecognised/.test(await diag()) && /Attempts: 8/.test(await diag()),
+  await diag());
+await c.eval(popup, `document.getElementById("diagnostics").open = true`);
+await c.shoot(popup, "popup-unknown-details");
+
+await setUnknown(undefined, "Failed to fetch");
+check("a reading without a reason keeps the original wording",
+  /Status unknown/.test(await popupText()));
+
+await setPolicy({ ...defaults, enabled: false });
+check("troubleshooting details are hidden where the extension is off",
+  (await c.eval(popup, `document.getElementById("diagnostics").hidden`)) === true);
+await setPolicy(defaults);
+
 // ── Console hygiene ─────────────────────────────────────────────────────────
 const errors = swLogs.filter((l) => /error|exception|unhandled/i.test(l));
 check("service worker console is clean", errors.length === 0, errors.join(" ;; "));

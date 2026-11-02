@@ -52,11 +52,30 @@ FEATURES
 • Recognises both WARP and WARP+
 • Stays quiet when you are simply offline — no false alarms when there is no
   network to check against
+• When a check cannot be completed, the popup says why — offline, timed out,
+  blocked by a firewall, or a Wi-Fi sign-in page in the way — and what to try,
+  with details you can copy into a help-desk ticket
 • Dismiss the banner for a tab when you need an unobstructed view; it returns
   on reload or the next time WARP drops
 • For managed deployments: administrators can limit it to chosen operating
   systems — where it is excluded it goes completely silent, making no checks
   at all — and can replace the banner wording with their own
+
+TROUBLESHOOTING
+
+If the toolbar icon shows a grey "?", the status could not be checked. Open
+the popup to see why, then:
+
+1. Make sure you are online. On hotel, airport or café Wi-Fi, open any
+   website and complete the sign-in page first.
+2. Press "Re-check now".
+3. Click "Open Cloudflare's check" in the popup. The page it opens is exactly
+   what the extension sees: "warp=on" means you are protected, "warp=off"
+   means WARP is not connected, and an error or a different page means your
+   network is blocking or intercepting the check.
+4. If it still fails and other websites load normally, a firewall, proxy or
+   DNS filter may be blocking cloudflare.com. Expand "Troubleshooting
+   details", press "Copy details", and send them to your IT team.
 
 PRIVACY
 
@@ -104,8 +123,9 @@ background service worker.
 
 ```
 Used to share the current WARP status between the background worker, the
-banner shown on pages, and the popup. Only the status string and a timestamp
-are stored, in session storage on the user's device. It also reads the
+banner shown on pages, and the popup. Only the status, a timestamp, and —
+when a check fails — a short reason and error message are stored, in session
+storage on the user's device, and cleared when the browser closes. It also reads the
 managed-storage settings an administrator may attach to a force-installed
 copy (which operating systems the extension runs on, and the banner wording);
 these are provided by Chrome from the device's policy store and are never
