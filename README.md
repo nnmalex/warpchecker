@@ -53,6 +53,38 @@ it, and it overlays rather than reflows the page. It is built with DOM APIs
 rather than `innerHTML` so that sites enforcing Trusted Types cannot block it.
 Dismissing it hides it for that tab until the page reloads or WARP drops again.
 
+## Troubleshooting an unknown status
+
+When a check is inconclusive the worker records *why*, and the popup words its
+advice to match. **Troubleshooting details** in the popup shows the raw facts,
+and **Copy details** puts them on the clipboard for a help-desk ticket.
+
+| Popup headline                              | Reason         | What happened / what to try |
+| ------------------------------------------- | -------------- | --------------------------- |
+| You're offline                              | `offline`      | Chrome reports no network. Reconnect; it updates by itself. |
+| Cloudflare didn't answer in time            | `timeout`      | No response within 6s on every attempt. Slow or lossy link, or something stalling the request. |
+| The status check was refused                | `http`         | A non-2xx answer, typically a proxy or firewall's 403. Check that `www.cloudflare.com/cdn-cgi/trace` is allowed. |
+| Cloudflare could not be reached             | `unreachable`  | The request never completed: DNS failure, refused connection, untrusted TLS certificate (SSL inspection), or a Wi-Fi sign-in page. |
+| Your network answered instead of Cloudflare | `intercepted`  | A web page came back instead of the trace: a sign-in page or a block page served with a trusted certificate. |
+| Unexpected answer from Cloudflare           | `unrecognised` | The trace arrived but had no `warp=` line. |
+
+For the next steps, in order:
+
+1. **Open Cloudflare's check** (link in the popup) to load the trace endpoint
+   in a tab. Whatever page that shows is what the extension saw. If it loads and
+   includes `warp=on`, the network is fine and **Re-check now** should agree.
+2. If it does not load, the problem is the network rather than the extension:
+   try another site, sign in to any Wi-Fi portal, or check the WARP app.
+3. For a closer look, open `chrome://extensions`, enable Developer mode, and
+   click **service worker** on the WARP Checker card. Each inconclusive check
+   logs one line there (`[WARP Checker] status unknown after N attempt(s): …`),
+   and `chrome.storage.session.get("warpState")` in that console shows the
+   stored reading.
+
+`fetch()` reports nearly every network failure as the same bare
+`Failed to fetch`, so `unreachable` cannot be split further from inside the
+extension. DNS, TLS and connection failures look identical to it.
+
 ## Administrator settings
 
 The extension can be force-installed from the Google Admin console with

@@ -69,6 +69,23 @@
       }
       button:hover:not(:disabled) { background: var(--btn-hover); }
       button:disabled { opacity: 0.6; cursor: default; }
+      details { margin-top: 12px; font-size: 12px; color: var(--muted); }
+      details[hidden] { display: none; }
+      summary { cursor: pointer; }
+      pre {
+        margin: 8px 0;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--btn);
+        color: var(--fg);
+        font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .diag-actions { display: flex; align-items: center; gap: 10px; }
+      .diag-actions button { font-size: 12px; padding: 4px 10px; }
+      a { color: inherit; }
     </style>
   </head>
   <body>
@@ -77,6 +94,15 @@
       <h1 id="headline">Checking&hellip;</h1>
     </div>
     <p id="detail">Contacting Cloudflare to read your connection status.</p>
+    <details id="diagnostics" hidden>
+      <summary>Troubleshooting details</summary>
+      <pre id="diag-text"></pre>
+      <div class="diag-actions">
+        <button id="copy" type="button">Copy details</button>
+        <a id="trace-link" href="https://www.cloudflare.com/cdn-cgi/trace"
+           target="_blank" rel="noopener">Open Cloudflare&rsquo;s check</a>
+      </div>
+    </details>
     <footer id="footer">
       <span class="checked" id="checked"></span>
       <button id="recheck" type="button">Re-check now</button>

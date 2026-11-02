@@ -152,17 +152,42 @@ function parseTrace(body) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Why a check came back "unknown". The popup turns these into advice, so the
+// distinction that matters is what the user can do about each one.
+const REASON = {
+  OFFLINE: "offline", // the browser itself says there is no network
+  TIMEOUT: "timeout", // something answered too slowly, or not at all
+  HTTP: "http", // a server answered, but refused (e.g. a proxy's 403)
+  UNREACHABLE: "unreachable", // DNS, TLS, refused connection, blocked request
+  INTERCEPTED: "intercepted", // a web page came back instead of the trace
+  UNRECOGNISED: "unrecognised", // the trace came back without a warp field
+};
+
+class HttpError extends Error {
+  constructor(status) {
+    super(`HTTP ${status}`);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
 async function fetchTrace() {
   const response = await fetch(TRACE_URL, {
     cache: "no-store",
     credentials: "omit",
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return parseTrace(await response.text());
+  if (!response.ok) throw new HttpError(response.status);
+  const body = await response.text();
+  return {
+    trace: parseTrace(body),
+    // A firewall block page or a sign-in page served in Cloudflare's place
+    // answers 200 with HTML, which the trace never is.
+    intercepted: response.redirected || /<html|<!doctype/i.test(body),
+  };
 }
 
-function classify(trace) {
+function classify({ trace, intercepted }) {
   const warp = trace.warp;
   if (warp === "on" || warp === "plus") {
     return { status: STATUS.CONNECTED, detail: warp };
@@ -171,15 +196,39 @@ function classify(trace) {
     return { status: STATUS.DISCONNECTED, detail: warp };
   }
   // Reachable but no recognisable warp field: don't accuse.
-  return { status: STATUS.UNKNOWN, detail: "unrecognised response" };
+  if (intercepted) {
+    return {
+      status: STATUS.UNKNOWN,
+      reason: REASON.INTERCEPTED,
+      detail: "received a web page instead of Cloudflare's trace",
+    };
+  }
+  return { status: STATUS.UNKNOWN, reason: REASON.UNRECOGNISED, detail: "unrecognised response" };
+}
+
+// fetch() reports almost every network failure as the same bare TypeError
+// ("Failed to fetch"), so the distinctions available are the ones made here.
+function describeFailure(error) {
+  if (navigator.onLine === false) {
+    return { reason: REASON.OFFLINE, detail: "the browser reports no network connection" };
+  }
+  if (error?.name === "TimeoutError") {
+    return { reason: REASON.TIMEOUT, detail: `no response within ${FETCH_TIMEOUT_MS / 1000}s` };
+  }
+  if (error instanceof HttpError) {
+    return { reason: REASON.HTTP, detail: error.message, httpStatus: error.status };
+  }
+  return { reason: REASON.UNREACHABLE, detail: String(error?.message || error) };
 }
 
 async function checkWarp() {
   let state;
   let lastError;
+  let attempts = 0;
   const deadline = Date.now() + RETRY_WINDOW_MS;
 
   do {
+    attempts++;
     try {
       state = classify(await fetchTrace());
       break;
@@ -191,7 +240,14 @@ async function checkWarp() {
 
   // Every attempt failed: offline, captive portal, DNS still down. Unknown,
   // never "disconnected".
-  state ??= { status: STATUS.UNKNOWN, detail: String(lastError?.message || lastError) };
+  state ??= { status: STATUS.UNKNOWN, ...describeFailure(lastError) };
+  state.attempts = attempts;
+
+  if (state.status === STATUS.UNKNOWN) {
+    console.info(
+      `[WARP Checker] status unknown after ${attempts} attempt(s): ${state.reason} — ${state.detail}`,
+    );
+  }
 
   state.lastChecked = Date.now();
   await chrome.storage.session.set({ warpState: state });
